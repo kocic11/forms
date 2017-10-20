@@ -124,7 +124,7 @@ class FrmProvisioner:
         self.startAdminServer(domainParentDir, domainName, domainUser, domainPassword)
         self.createOhs(domainName, domainParentDir, domainUser, domainPassword)
         self.createReportComponents('reportsToolsInstance1', 'machine1', 'reportsServerInstance1', 'machine1')
-        self.shutdownAdminserverAndNM()
+        #self.shutdownAdminserverAndNM()
 
     def createBaseDomain(self, name, user, password, domainType):
         baseTemplate = self.replaceTokens(
