@@ -121,7 +121,10 @@ class FrmProvisioner:
         domainHome = self.createBaseDomain(name, user, password, domainType)
         self.extendFormsDomain(domainHome, db, dbPrefix, dbPassword)
         self.updateFormMachine(domainName, domainParentDir)
+        self.startAdminServer(domainParentDir, domainName, domainUser, domainPassword)
         self.createOhs(domainName, domainParentDir, domainUser, domainPassword)
+        self.createReportComponents('reportsToolsInstance1', 'machine1', 'reportsServerInstance1', 'machine1')
+        self.shutdownAdminserverAndNM()
 
     def createBaseDomain(self, name, user, password, domainType):
         baseTemplate = self.replaceTokens(
@@ -288,7 +291,7 @@ class FrmProvisioner:
     def createOhs(self, domainName, domainParentDir, domainUser, domainPassword):
         print 'INFO: Creating OHS servers...'
 
-        self.connectToAdminserver(domainParentDir, domainName, domainUser, domainPassword)
+        #self.startAdminServer(domainParentDir, domainName, domainUser, domainPassword)
 
         for server in self.OHS_SERVERS:
             instanceName = server
@@ -298,7 +301,7 @@ class FrmProvisioner:
             ohs_createInstance(
                 instanceName=instanceName, machine=machine, listenPort=listenPort, sslPort=sslPort)
 
-        self.shutdownAdminserverAndNM()
+        #self.shutdownAdminserverAndNM()
 
         print 'INFO: OHS servers created.....'
         return
@@ -326,14 +329,16 @@ class FrmProvisioner:
             f.close()
 
     def createReportComponents(self, reportsToolsInstanceName, reportsToolsInstanceMachine, reportsServerInstanceName, reportsServerInstanceMachine):
-        self.connectToAdminserver(domainParentDir, domainName, domainUser, domainPassword)
+        print "Creating report components ..."
+        #self.startAdminServer(domainParentDir, domainName, domainUser, domainPassword)
 
         createReportsToolsInstance(
             instanceName=reportsToolsInstanceName, machine=reportsToolsInstanceMachine)
         createReportsServerInstance(
             instanceName=reportsServerInstanceName, machine=reportsServerInstanceMachine)
 
-        self.shutdownAdminserverAndNM()
+        #self.shutdownAdminserverAndNM()
+        print "Report components created."
 
     ###########################################################################
     # Helper Methods                                                          #
@@ -364,44 +369,36 @@ class FrmProvisioner:
             result = path.replace('@@ORACLE_HOME@@', oracleHome)
         return result
 
-    def startNodeManager(self, domainParentDir, domainName):
-        
-        if not nm():
-            try:
-                nmConnect(userConfigFile='/home/fradmin/nm.secure', userKeyFile='/home/fradmin/nmkey.secure', host=host_name, port=5556, domainName='bmoris', domainDir='/u01/app/oracle/admin/domains/bmoris', nmType='ssl')
-            except:
-                print "Starting Node Manager ..."
-                nmDir = domainParentDir + '/' + domainName + '/nodemanager'
-                startNodeManager(verbose='true', NodeManagerHome=nmDir)
-                print "Node Manager started."
-        else:
-            print "Node Manager is already running."
-
     def startAdminServer(self, domainParentDir, domainName, domainUser, domainPassword):
         state_admin = nmServerStatus('AdminServer')
         if not (state_admin == 'RUNNING'):
-            self.startNodeManager(domainParentDir, domainName)
-            
+            adminMachine = self.SERVERS['AdminServer']['Machine']
+            machineHost = self.MACHINES[adminMachine]['ListenAddress']
+            machinePort = self.MACHINES[adminMachine]['ListenPort']
             domainHome = domainParentDir + '/' + domainName
-            self.createBootPropertiesFile(domainHome, domainUser, domainPassword)
-
-            nmConnect(username=domainUser, password=domainPassword, host=machineHost,
-                    port=machinePort, domainName=domainName, domainDir=domainHome, nmType='SSL')
+            if (os.system('pgrep -f NodeManager') == 1):
+                print "Starting Node Manager ..."
+                nmDir = domainParentDir + '/' + domainName + '/nodemanager'
+                startNodeManager(verbose='true', NodeManagerHome=nmDir, block='true', username=domainUser, password=domainPassword, host=machineHost,
+                                 port=machinePort, domainName=domainName, domainDir=domainHome, nmType='SSL')
+                print "Node Manager started."
+            else:
+                print "Node Manager is already running."
+            domainHome = domainParentDir + '/' + domainName
+            self.createBootPropertiesFile(
+                domainHome, domainUser, domainPassword)
+            print "Starting Admin server ..."
             nmStart('AdminServer')
+            print "Admin server started."
 
-    def connectToAdminserver(self, domainParentDir, domainName, domainUser, domainPassword):
-        self.startNodeManager(domainParentDir, domainName)
-        self.startAdminServer(domainParentDir, domainName, domainUser, domainPassword)
-        
-        adminHost = self.SERVERS['AdminServer']['ListenAddress']
-        adminPort = self.SERVERS['AdminServer']['ListenPort']
-        if adminHost == '':
-            adminHost = 'localhost'
+            adminHost = self.SERVERS['AdminServer']['ListenAddress']
+            adminPort = self.SERVERS['AdminServer']['ListenPort']
+            if adminHost == '':
+                adminHost = 'localhost'
+            adminUrl = adminHost + ':' + str(adminPort)
+            connect(username=domainUser, password=domainPassword, url=adminUrl)
 
-        adminUrl = adminHost + ':' + str(adminPort)
-        connect(username=domainUser, password=domainPassword, url=adminUrl)
-    
-    def shutdownAdminserverAndNM():
+    def shutdownAdminserverAndNM(self):
         shutdown('AdminServer', force='true', block='true')
         stopNodeManager()
 
