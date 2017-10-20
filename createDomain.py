@@ -53,7 +53,7 @@ class FrmProvisioner:
         'WLS_FORMS1': {
             'ListenAddress': '',
             'ListenPort': 9001,
-            'Machine': 'machine2',
+            'Machine': 'machine1',
             'Cluster': 'forms_cluster'
         }
     }
@@ -62,7 +62,7 @@ class FrmProvisioner:
         'WLS_REPORTS1': {
             'ListenAddress': '',
             'ListenPort': 9002,
-            'Machine': 'machine3',
+            'Machine': 'machine1',
             'Cluster': 'reports_cluster'
         }
     }
